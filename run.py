@@ -5,9 +5,12 @@
 - 打包模式：  PyInstaller 以本文件为入口，双击生成的 exe 运行。
 """
 
+import sys
 import threading
 import time
+import traceback
 import urllib.request
+from pathlib import Path
 
 import uvicorn
 import webview
@@ -17,6 +20,15 @@ from app.main import app
 HOST = "127.0.0.1"
 PORT = 8877
 URL = f"http://{HOST}:{PORT}/"
+
+_SERVE_ERROR = None
+
+
+def _error_log_path() -> Path:
+    """错误日志位置：打包后写 exe 同级，开发时写源码目录。"""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent / "seeSRT_error.log"
+    return Path(__file__).resolve().parent / "seeSRT_error.log"
 
 
 def _wait_ready(timeout: float = 20.0) -> bool:
@@ -32,16 +44,40 @@ def _wait_ready(timeout: float = 20.0) -> bool:
 
 
 def _serve() -> None:
-    """在后台线程运行 FastAPI 服务。"""
-    uvicorn.run(app, host=HOST, port=PORT, log_level="warning")
+    """在后台线程运行 FastAPI 服务，捕获并记录启动异常。"""
+    global _SERVE_ERROR
+    try:
+        uvicorn.run(app, host=HOST, port=PORT, log_level="warning")
+    except Exception:
+        _SERVE_ERROR = traceback.format_exc()
+        try:
+            _error_log_path().write_text(_SERVE_ERROR, encoding="utf-8")
+        except Exception:
+            pass
+
+
+def _show_error(message: str) -> None:
+    """用系统消息框显示错误（打包为 GUI 应用时无控制台可打印）。"""
+    try:
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(0, message, "seeSRT 启动失败", 0x10)
+    except Exception:
+        pass
 
 
 def main() -> None:
     threading.Thread(target=_serve, daemon=True).start()
     if not _wait_ready():
-        raise RuntimeError(
-            f"seeSRT 服务启动超时，请确认端口 {PORT} 未被占用后重试"
+        detail = _SERVE_ERROR or "未知原因"
+        _show_error(
+            "seeSRT 服务启动失败。\n\n"
+            "常见原因：\n"
+            "  1) 缺少 VC++ 运行库（请用最新安装包重新安装）\n"
+            "  2) 端口 8877 被占用\n\n"
+            f"详细信息：\n{detail}"
         )
+        raise RuntimeError(f"seeSRT 服务启动失败，详见 {_error_log_path()}")
     webview.create_window(
         "seeSRT · 字幕智能纠错",
         URL,

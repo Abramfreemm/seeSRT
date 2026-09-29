@@ -12,6 +12,9 @@ venv/
 build/
 dist/
 
+# Inno Setup 安装包产物（setup.exe / vc_redist.x64.exe）
+installer/
+
 # 运行时数据（便携模式，exe 同级自动生成）
 data/
 
