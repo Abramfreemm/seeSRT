@@ -16,19 +16,19 @@ OutputDir=installer
 OutputBaseFilename=seeSRT_setup
 Compression=lzma2
 SolidCompression=yes
-ArchitecturesAllowed=x64
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\seeSRT.exe
 WizardStyle=modern
 DisableProgramGroupPage=yes
+; 本应用为自包含便携程序，安装后立即可用，不提示重启
+RestartIfNeededByRun=no
 
 [Languages]
 Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
 [Files]
 Source: "dist\seeSRT\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
-; 附带微软官方 VC++ 运行库，安装到临时目录，装完自动删除
-Source: "installer\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
 Name: "{group}\seeSRT"; Filename: "{app}\seeSRT.exe"
@@ -39,6 +39,4 @@ Name: "{autodesktop}\seeSRT"; Filename: "{app}\seeSRT.exe"; Tasks: desktopicon
 Name: "desktopicon"; Description: "创建桌面快捷方式(&D)"; GroupDescription: "附加任务："
 
 [Run]
-; 先静默安装 VC++ 运行库（等待完成），再运行程序
-Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "正在安装 VC++ 运行库..."; Flags: waituntilterminated
 Filename: "{app}\seeSRT.exe"; Description: "立即运行 seeSRT(&R)"; Flags: nowait postinstall skipifsilent

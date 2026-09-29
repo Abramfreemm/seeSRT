@@ -329,14 +329,37 @@ function jumpToEpisode() {
   }
 }
 
+function isDesktop() {
+  return !!(window.pywebview && window.pywebview.api && window.pywebview.api.save_text);
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
 async function exportSrt() {
-  const data = await api("/api/export", { episode_no: state.current });
-  const blob = new Blob([data.srt], { type: "text/plain;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = data.filename;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  try {
+    const data = await api("/api/export", { episode_no: state.current });
+    if (isDesktop()) {
+      const r = await window.pywebview.api.save_text(data.filename, data.srt);
+      if (r && !r.ok && !r.canceled) alert("保存失败: " + r.error);
+      return;
+    }
+    const blob = new Blob([data.srt], { type: "text/plain;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = data.filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 function updateBatchExport() {
@@ -355,6 +378,13 @@ async function exportBatch() {
       throw new Error(err.detail || res.statusText);
     }
     const blob = await res.blob();
+    if (isDesktop()) {
+      const buf = await blob.arrayBuffer();
+      const b64 = arrayBufferToBase64(buf);
+      const r = await window.pywebview.api.save_bytes("seeSRT_export.zip", b64);
+      if (r && !r.ok && !r.canceled) alert("保存失败: " + r.error);
+      return;
+    }
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "seeSRT_export.zip";

@@ -69,3 +69,47 @@ class TestSplitGroup:
         segs = split_group(_group(text, end="00:00:04,000"))
         assert len(segs) == 1
         assert segs[0].end == "00:00:04,000"
+
+
+def _multi_group():
+    """一条剧本台词命中两个相邻原始片段。"""
+    seg1 = SrtSegment(index=1, start="00:00:01,000", end="00:00:02,000", text="Hello world")
+    seg2 = SrtSegment(index=2, start="00:00:02,000", end="00:00:03,000", text="how are you")
+    return AlignedGroup(
+        dialogue_index=0,
+        segments=[seg1, seg2],
+        correct_text="Hello world how are you",
+    )
+
+
+class TestSplitGroupPreservesBoundaries:
+    def test_multi_segment_keeps_original_timecodes(self):
+        segs = split_group(_multi_group())
+        assert len(segs) == 2
+        # 每个原始片段的 start/end 原样保留
+        assert (segs[0].start, segs[0].end) == ("00:00:01,000", "00:00:02,000")
+        assert (segs[1].start, segs[1].end) == ("00:00:02,000", "00:00:03,000")
+
+    def test_multi_segment_distributes_correct_text(self):
+        segs = split_group(_multi_group())
+        assert segs[0].text == "Hello world"
+        assert segs[1].text == "how are you"
+
+    def test_multi_segment_each_two_lines_max(self):
+        segs = split_group(_multi_group())
+        for s in segs:
+            assert s.text.count("\n") <= 1
+            for line in s.text.split("\n"):
+                assert len(line) <= 23
+
+    def test_correct_text_typo_fix_stays_in_segment(self):
+        # 原片段有拼写错误，正确文本应替换回同一片段，时间码不变
+        seg1 = SrtSegment(index=1, start="00:00:01,000", end="00:00:02,000", text="Wll hello")
+        seg2 = SrtSegment(index=2, start="00:00:02,000", end="00:00:03,000", text="there")
+        g = AlignedGroup(dialogue_index=0, segments=[seg1, seg2], correct_text="Will hello there")
+        segs = split_group(g)
+        assert len(segs) == 2
+        assert segs[0].start == "00:00:01,000"
+        assert segs[0].end == "00:00:02,000"
+        assert segs[0].text == "Will hello"
+        assert segs[1].text == "there"

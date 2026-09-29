@@ -5,6 +5,7 @@
 - 打包模式：  PyInstaller 以本文件为入口，双击生成的 exe 运行。
 """
 
+import base64
 import sys
 import threading
 import time
@@ -66,6 +67,45 @@ def _show_error(message: str) -> None:
         pass
 
 
+class Api:
+    """暴露给前端（pywebview js_api）的本地保存能力。
+
+    WebView2 内核默认不触发浏览器式 blob 下载，故改为弹出系统「保存文件」
+    对话框，由 Python 直接写入用户选择的位置（浏览器模式仍用原 blob 下载兜底）。
+    """
+
+    def _save_dialog(self, filename: str):
+        window = webview.windows[0]
+        return window.create_file_dialog(
+            webview.FileDialog.SAVE, save_filename=filename
+        )
+
+    def save_text(self, filename: str, content: str) -> dict:
+        """保存文本文件（SRT）。"""
+        result = self._save_dialog(filename)
+        if not result:
+            return {"ok": False, "canceled": True}
+        try:
+            with open(result[0], "w", encoding="utf-8", newline="\n") as f:
+                f.write(content)
+            return {"ok": True, "path": result[0]}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def save_bytes(self, filename: str, content_b64: str) -> dict:
+        """保存二进制文件（zip），内容以 base64 传输。"""
+        result = self._save_dialog(filename)
+        if not result:
+            return {"ok": False, "canceled": True}
+        try:
+            data = base64.b64decode(content_b64)
+            with open(result[0], "wb") as f:
+                f.write(data)
+            return {"ok": True, "path": result[0]}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+
 def main() -> None:
     threading.Thread(target=_serve, daemon=True).start()
     if not _wait_ready():
@@ -84,6 +124,7 @@ def main() -> None:
         width=1280,
         height=860,
         min_size=(960, 640),
+        js_api=Api(),
     )
     webview.start()
 
