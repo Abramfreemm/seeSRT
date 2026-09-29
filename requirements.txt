@@ -1,0 +1,11 @@
+# seeSRT 依赖清单
+
+# 核心运行时依赖
+fastapi
+uvicorn[standard]
+python-multipart
+python-docx
+pywebview
+
+# 开发/测试依赖
+pytest

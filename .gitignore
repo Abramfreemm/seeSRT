@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 测试缓存
+.pytest_cache/
+
+# PyInstaller 打包产物
+build/
+dist/
+
+# 运行时数据（便携模式，exe 同级自动生成）
+data/
+
+# 剧本文本与字幕样例（含真实版权内容，不上传）
+samples/
+
+# 达芬奇字幕预设（二进制工作文件）
+*.preset
+
+# IDE / 编辑器
+.vscode/
+.idea/
+
+# 系统文件
+Thumbs.db
+Desktop.ini
+.DS_Store

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>seeSRT · 字幕智能纠错</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">seeSRT <span>字幕智能纠错</span></div>
+    <div class="topbar-right">
+      <div class="steps">
+        <span class="step" data-step="1">1 上传剧本</span>
+        <span class="step" data-step="2">2 上传 SRT</span>
+        <span class="step" data-step="3">3 审查纠错</span>
+        <span class="step" data-step="4">4 导出</span>
+      </div>
+      <button class="btn danger" id="reset-btn">恢复初始</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel lib-panel">
+      <h2>台词库 <span class="muted">(上传剧本后自动拆分 · 点击复制英文台词)</span></h2>
+      <div id="lib" class="lib"></div>
+    </section>
+
+    <section class="panel upload-panel">
+      <h2>数据导入</h2>
+      <div class="controls">
+        <div class="ctrl">
+          <label class="btn">上传剧本 (.docx/.txt)
+            <input type="file" id="script-input" accept=".docx,.txt,.fountain" hidden />
+          </label>
+          <span id="script-status" class="muted">未上传</span>
+        </div>
+        <div class="ctrl">
+          <label class="btn">上传 SRT（可多选，文件名=集数）
+            <input type="file" id="srt-input" accept=".srt" multiple hidden />
+          </label>
+          <span id="srt-status" class="muted">未上传</span>
+        </div>
+        <div class="ctrl">
+          <select id="episode-select" disabled>
+            <option value="">-- 选择集 --</option>
+          </select>
+          <button class="btn primary" id="process-btn" disabled>对齐 + 纠错</button>
+        </div>
+        <button class="btn" id="batch-btn" disabled>批量处理全部已上传集</button>
+        <button class="btn export" id="export-btn" hidden>导出当前集 SRT</button>
+        <button class="btn export" id="export-batch-btn" hidden>批量导出全部已处理集 (.zip)</button>
+      </div>
+      <div class="stats" id="stats" hidden></div>
+      <div class="report" id="report" hidden></div>
+    </section>
+
+    <section class="panel review-panel">
+      <h2>审查区 <span class="muted" id="review-hint"></span></h2>
+      <div id="groups" class="groups"></div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
