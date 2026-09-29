@@ -57,6 +57,13 @@
 
     <section class="panel review-panel">
       <h2>审查区 <span class="muted" id="review-hint"></span></h2>
+      <div class="review-toolbar">
+        <label class="muted">跳转集数</label>
+        <input type="number" id="ep-jump-input" placeholder="输入集数" min="1" />
+        <button class="btn small" id="ep-jump-btn">跳转</button>
+        <span class="muted" id="ep-jump-hint"></span>
+        <button class="btn small primary" id="review-all-btn" hidden>复核全部未命中</button>
+      </div>
       <div id="groups" class="groups"></div>
     </section>
   </main>

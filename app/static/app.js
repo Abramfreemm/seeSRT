@@ -64,10 +64,22 @@ function renderDiffLine(ops, side) {
   return html;
 }
 
+function updateStickyOffsets() {
+  // 精确测量顶栏与台词库面板高度，让台词库、审查区工具栏在滚动时依次吸顶固定
+  const topbar = document.querySelector(".topbar");
+  const libPanel = document.querySelector(".lib-panel");
+  const toolbar = document.querySelector(".review-toolbar");
+  if (!topbar || !libPanel || !toolbar) return;
+  const topbarH = topbar.offsetHeight;
+  libPanel.style.top = topbarH + "px";
+  toolbar.style.top = (topbarH + libPanel.offsetHeight) + "px";
+}
+
 function renderLib() {
   const lib = $("#lib");
   if (!state.episodes.length) {
     lib.innerHTML = '<span class="muted">上传剧本后显示台词库</span>';
+    updateStickyOffsets();
     return;
   }
   lib.innerHTML = state.episodes.map((ep) => `
@@ -83,6 +95,7 @@ function renderLib() {
             </div>`).join("")}
         </div>`).join("")}
     </div>`).join("");
+  updateStickyOffsets();
 }
 
 function updateEpisodeSelect() {
@@ -100,6 +113,7 @@ function updateEpisodeSelect() {
 
 function renderGroups() {
   const box = $("#groups");
+  updateReviewAllBtn();
   if (!state.current) {
     box.innerHTML = '<span class="muted">选择集后在此审查</span>';
     $("#export-btn").hidden = true;
@@ -266,6 +280,55 @@ async function toggleReview(id, reviewed) {
   }
 }
 
+function updateReviewAllBtn() {
+  const btn = $("#review-all-btn");
+  const unReviewed = (state.groups || []).filter(
+    (g) => !g.matched && !g.is_sound_marker && !g.reviewed
+  ).length;
+  btn.hidden = unReviewed === 0;
+  btn.textContent = `复核全部未命中 (${unReviewed})`;
+}
+
+async function reviewAll() {
+  if (!state.current) return;
+  try {
+    const r = await api("/api/review_batch", { episode_no: state.current });
+    for (const g of state.groups) {
+      if (!g.matched && !g.is_sound_marker) g.reviewed = true;
+    }
+    state.processed[state.current] = state.groups;
+    renderGroups();
+    bindGroupEvents();
+    alert(`已复核 ${r.reviewed} 个未命中片段`);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+function jumpToEpisode() {
+  const v = $("#ep-jump-input").value.trim();
+  if (!v) return;
+  const ep = Number(v);
+  if (!Number.isInteger(ep) || ep <= 0) {
+    $("#ep-jump-hint").textContent = "请输入正整数集数";
+    return;
+  }
+  const exists = state.episodes.some((e) => e.episode_no === ep);
+  if (!exists) {
+    $("#ep-jump-hint").textContent = `未找到第 ${ep} 集`;
+    return;
+  }
+  if (state.srtFilenames[ep]) {
+    $("#episode-select").value = String(ep);
+  }
+  selectEpisode(ep);
+  if (state.processed[ep]) {
+    $("#ep-jump-hint").textContent = "";
+  } else {
+    $("#ep-jump-hint").textContent = `第 ${ep} 集尚未处理，请先「对齐 + 纠错」`;
+  }
+}
+
 async function exportSrt() {
   const data = await api("/api/export", { episode_no: state.current });
   const blob = new Blob([data.srt], { type: "text/plain;charset=utf-8" });
@@ -322,6 +385,8 @@ async function resetAll() {
   $("#script-input").value = "";
   $("#srt-input").value = "";
   $("#review-hint").textContent = "";
+  $("#ep-jump-input").value = "";
+  $("#ep-jump-hint").textContent = "";
   renderLib();
   updateEpisodeSelect();
   updateBatchExport();
@@ -483,6 +548,11 @@ function bindGlobal() {
   $("#export-btn").addEventListener("click", exportSrt);
   $("#export-batch-btn").addEventListener("click", exportBatch);
   $("#reset-btn").addEventListener("click", resetAll);
+  $("#ep-jump-btn").addEventListener("click", jumpToEpisode);
+  $("#ep-jump-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") jumpToEpisode();
+  });
+  $("#review-all-btn").addEventListener("click", reviewAll);
 
   $("#lib").addEventListener("click", (e) => {
     const dlg = e.target.closest(".lib-dlg");
@@ -498,4 +568,6 @@ function bindGlobal() {
 }
 
 bindGlobal();
+updateStickyOffsets();
+window.addEventListener("resize", updateStickyOffsets);
 restoreState().catch(() => {});

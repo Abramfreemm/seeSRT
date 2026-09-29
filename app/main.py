@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Dict
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -27,13 +26,9 @@ from app.split.splitter import split_group
 from app.srt_parser import is_sound_marker, read_srt_file
 from app.storage import clear_state, load_state, save_state
 
+# 本地桌面应用：前端与后端同源（127.0.0.1:8877），无需 CORS。
+# 刻意不启用 CORSMiddleware，避免任意网页跨域读取本地剧本数据（安全最佳实践）。
 app = FastAPI(title="seeSRT")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # 内存态：启动时从磁盘恢复，运行中随关键操作持久化
 STATE: Dict = load_state() or {
@@ -237,6 +232,25 @@ def review(payload: ReviewPayload):
     groups[payload.group_id].reviewed = payload.reviewed
     _persist()
     return _group_to_dict(groups[payload.group_id], payload.group_id)
+
+
+class ReviewBatchPayload(BaseModel):
+    episode_no: int
+
+
+@app.post("/api/review_batch")
+def review_batch(payload: ReviewBatchPayload):
+    """一键复核：把某集所有未命中（非音效）片段标记为已复核。"""
+    groups = STATE["groups"].get(payload.episode_no)
+    if groups is None:
+        raise HTTPException(400, "该集尚未处理，请先执行对齐/纠错")
+    count = 0
+    for g in groups:
+        if not g.matched and not is_sound_marker(g.correct_text) and not g.reviewed:
+            g.reviewed = True
+            count += 1
+    _persist()
+    return {"episode_no": payload.episode_no, "reviewed": count}
 
 
 class ExportPayload(BaseModel):
