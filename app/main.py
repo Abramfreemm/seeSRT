@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import re
-import sys
 import tempfile
 import zipfile
 from io import BytesIO
@@ -329,9 +328,12 @@ def reset():
 
 # 静态前端（放在最后，避免覆盖 /api 路由）
 def _static_dir() -> Path:
-    """静态资源目录：打包后从 PyInstaller 解压目录读取，开发时从源码目录读取。"""
-    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
-    return base / "static"
+    """静态资源目录：开发时在 app/static，打包后在 <解压目录>/app/static。
+
+    spec 里 datas 将 app/static 收集到 <解压目录>/app/static，因此直接以本文件
+    （app/main.py）所在目录为基准取 static 即可，开发/打包两种场景都正确。
+    """
+    return Path(__file__).resolve().parent / "static"
 
 
 _STATIC_DIR = _static_dir()
