@@ -199,3 +199,18 @@ class TestSplitGroupZh:
         assert (segs[0].start, segs[0].end) == ("00:00:01,000", "00:00:02,000")
         assert segs[0].text == "你好世界"
         assert segs[1].text == "谢谢"
+
+    def test_zh_punctuation_preserved(self):
+        # 中文标点按剧本原文保留，并随内容分配到对应片段
+        seg1 = SrtSegment(index=1, start="00:00:01,000", end="00:00:02,000", text="你好世办")
+        seg2 = SrtSegment(index=2, start="00:00:02,000", end="00:00:03,000", text="谢谢")
+        g = AlignedGroup(
+            dialogue_index=0,
+            segments=[seg1, seg2],
+            correct_text="你好，世界。谢谢！",
+            lang="zh",
+        )
+        segs = split_group(g)
+        assert len(segs) == 2
+        assert segs[0].text == "你好，世界。"
+        assert segs[1].text == "谢谢！"

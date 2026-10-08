@@ -37,6 +37,13 @@ _TIME_LINE_RE = re.compile(
 )
 # 音效/环境声标记：整段被方括号包裹，如 "[MUSIC PLAYING]"
 _SOUND_MARKER_RE = re.compile(r"^\[[^\]]*\]$")
+# HTML 标签（如 <b> / </b> / <i> / <font color="...">），字幕导入时应删除
+_HTML_TAG_RE = re.compile(r"</?[a-zA-Z][^>]*>")
+
+
+def _strip_html_tags(text: str) -> str:
+    """删除字幕文本里的 HTML 标签，只保留文字内容。"""
+    return _HTML_TAG_RE.sub("", text)
 
 
 def is_sound_marker(text: str) -> bool:
@@ -131,7 +138,7 @@ def _parse_block(block: str) -> Optional[Tuple[str, str, str, Optional[int]]]:
 
     m = _TIME_LINE_RE.search(lines[time_line_idx])
     start, end = m.group(1), m.group(2)
-    seg_text = "\n".join(lines[time_line_idx + 1 :]).strip()
+    seg_text = _strip_html_tags("\n".join(lines[time_line_idx + 1 :])).strip()
     return start, end, seg_text, index
 
 

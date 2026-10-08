@@ -72,6 +72,17 @@ class TestParseSrt:
     def test_empty_content(self):
         assert parse_srt("") == []
 
+    def test_strip_html_tags(self):
+        content = "1\n00:00:01,000 --> 00:00:04,000\n<b>Hello</b> <i>world</i>\n"
+        segs = parse_srt(content)
+        assert segs[0].text == "Hello world"
+
+    def test_strip_html_tags_keeps_plain_less_than(self):
+        # 只删除形如 <b> 的 HTML 标签，保留普通小于号
+        content = "1\n00:00:01,000 --> 00:00:04,000\n2 < 3\n"
+        segs = parse_srt(content)
+        assert segs[0].text == "2 < 3"
+
 
 class TestWriteSrt:
     def test_roundtrip(self):

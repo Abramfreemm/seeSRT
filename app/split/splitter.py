@@ -23,7 +23,7 @@ from difflib import SequenceMatcher
 from typing import List, Optional, Tuple
 
 from app.correct.corrector import AlignedGroup
-from app.lang import join_tokens, max_chars_for, tokenize_pairs
+from app.lang import join_tokens, max_chars_for, tokenize_pairs, zh_units
 from app.srt_parser import SrtSegment, format_timestamp, parse_timestamp
 
 # 句子边界：英文句末标点（. ! ?）后跟空格
@@ -147,6 +147,9 @@ def _distribute_correct_text(
     if n == 1:
         return [correct_text]
 
+    if lang == "zh":
+        return _distribute_correct_text_zh(segments, correct_text)
+
     # 原始 token 序列，记录每个 token 属于哪个片段
     orig_tokens: List[Tuple[str, int]] = []
     orig_norm: List[str] = []
@@ -180,6 +183,74 @@ def _distribute_correct_text(
         # "delete"：原始识别多出的 token 被删除，无需处理
 
     return [join_tokens(ts, lang) for ts in seg_tokens]
+
+
+def _distribute_correct_text_zh(
+    segments: List[SrtSegment], correct_text: str
+) -> List[str]:
+    """中文版：内容逐字对齐后，再把正确文本里的标点重新附加回片段。
+
+    中文 SRT 常缺标点，而剧本原文带标点。直接做字对齐时标点会干扰匹配，因此：
+    1) 先忽略标点做内容 token 对齐，得到每个内容 token 归属的片段；
+    2) 再按顺序扫描正确文本，把标点附加到它前面的内容 token 所在片段，
+       保证剧本原文的标点（，。！？… 等）完整保留。
+    """
+    n = len(segments)
+
+    orig_tokens: List[Tuple[str, int]] = []
+    orig_norm: List[str] = []
+    for si, seg in enumerate(segments):
+        ot, on = tokenize_pairs(seg.text, "zh")
+        for tok, norm in zip(ot, on):
+            orig_tokens.append((tok, si))
+            orig_norm.append(norm)
+
+    correct_tokens, correct_norm = tokenize_pairs(correct_text, "zh")
+
+    if not orig_tokens:
+        result = ["" for _ in range(n)]
+        result[0] = correct_text
+        return result
+
+    matcher = SequenceMatcher(None, orig_norm, correct_norm, autojunk=False)
+
+    # 每个正确文本的内容 token → 归属片段索引
+    token_seg: List[int] = []
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            for k in range(i2 - i1):
+                token_seg.append(orig_tokens[i1 + k][1])
+        elif tag in ("replace", "insert"):
+            seg_idx = orig_tokens[i1][1] if i1 < len(orig_tokens) else n - 1
+            for _ in range(j2 - j1):
+                token_seg.append(seg_idx)
+        # "delete"：丢弃
+
+    if not token_seg:
+        # 正确文本无内容 token（如纯标点），整体放第一段
+        result = ["" for _ in range(n)]
+        result[0] = correct_text
+        return result
+
+    seg_parts: List[List[str]] = [[] for _ in range(n)]
+    idx = 0
+    pending_punct = ""
+    for is_content, unit_text in zh_units(correct_text):
+        if is_content:
+            if pending_punct:
+                # 标点附加到它前面的内容 token 所在片段（开头标点归第一个片段）
+                seg_parts[token_seg[0] if idx == 0 else token_seg[idx - 1]].append(
+                    pending_punct
+                )
+                pending_punct = ""
+            seg_parts[token_seg[idx]].append(unit_text)
+            idx += 1
+        else:
+            pending_punct += unit_text
+    if pending_punct:
+        seg_parts[token_seg[-1]].append(pending_punct)
+
+    return ["".join(p) for p in seg_parts]
 
 
 def _emit_range(

@@ -440,6 +440,7 @@ function selectEpisode(ep) {
   state.groups = state.processed[ep] || [];
   state.report = state.reports[ep] || null;
   renderGroups();
+  bindGroupEvents();
   renderReport();
   if (state.processed[ep]) {
     $("#export-btn").hidden = false;

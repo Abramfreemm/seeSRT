@@ -65,6 +65,24 @@ def join_tokens(tokens: List[str], lang: str) -> str:
     return " ".join(tokens) if lang == "en" else "".join(tokens)
 
 
+def zh_units(text: str):
+    """把中文文本按顺序切成 (是否内容, 文本) 单元。
+
+    内容单元 = 单个汉字或连续英文/数字；标点单元 = 其余字符（含空白、标点）。
+    用于「内容对齐后再把标点重新附加回片段」，避免中文标点被丢弃。
+    """
+    units = []
+    pos = 0
+    for m in _ZH_TOKEN_RE.finditer(text):
+        if m.start() > pos:
+            units.append((False, text[pos:m.start()]))
+        units.append((True, m.group()))
+        pos = m.end()
+    if pos < len(text):
+        units.append((False, text[pos:]))
+    return units
+
+
 def max_chars_for(lang: str) -> int:
     """返回该语言每行字符上限。"""
     return MAX_CHARS.get(lang, MAX_CHARS["en"])
