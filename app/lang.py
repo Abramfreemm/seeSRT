@@ -12,8 +12,12 @@ import re
 from typing import List
 
 _CJK_RE = re.compile(r"[\u4e00-\u9fff]")
-# 中文 token：单个汉字，或连续英文/数字
-_ZH_TOKEN_RE = re.compile(r"[\u4e00-\u9fff]|[A-Za-z0-9]+")
+# 中文 token：优先把成对括号（书名号《》等）作为一个整体，其次单个汉字，或连续英文/数字。
+# 这样书名号及其中的书名在分词/对齐/分配时保持完整，不会被拆开。
+_ZH_TOKEN_RE = re.compile(
+    r"《[^《》]*》|「[^「」]*」|『[^『』]*』|（[^（）]*）|【[^【】]*】|“[^“”]*”|‘[^‘’]*’"
+    r"|[\u4e00-\u9fff]|[A-Za-z0-9]+"
+)
 
 # 每行字符上限：中文 12 字，英文 23 字符
 MAX_CHARS = {"zh": 12, "en": 23}

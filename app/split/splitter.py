@@ -12,7 +12,7 @@
 规则（剪辑师规范）：
 - 每行 ≤ 23 字符（英文半角，含空格 + 标点）或 ≤ 12 字（中文）。
 - 超长在逗号/空格（英文单词）或中文标点（中文）边界换行。
-- 每片段最多 2 行。
+- 每片段：英文最多 2 行，中文单行。
 - 不增删改词，只做换行（纠错文本已在此前阶段确定）。
 """
 
@@ -39,6 +39,9 @@ _COMMA = ","
 _SPACE = " "
 # 中文换行优先断点：在逗号/顿号/分号等标点处换行
 _ZH_BREAKS = "，、；。！？"
+# 成对括号：换行时不允许拆开（书名号《》等）
+_OPEN_BRACKETS = "《「『（【“‘"
+_CLOSE_BRACKETS = "》」』）】”’"
 
 
 def split_sentences(text: str, lang: str = "en") -> List[str]:
@@ -48,19 +51,41 @@ def split_sentences(text: str, lang: str = "en") -> List[str]:
     return [s for s in _SENTENCE_RE.split(text.strip()) if s]
 
 
+def _safe_zh_break(text: str, max_chars: int) -> int:
+    """返回 ≤ max_chars 的安全断点：优先在中文标点处，且不拆开括号对（书名号等）。
+
+    若候选断点落在未闭合的括号对内（如《书名》中间），则前移到最外层开括号之前，
+    保证书名号及其中的书名保持完整。
+    """
+    chunk = text[:max_chars]
+    pos = -1
+    for ch in _ZH_BREAKS:
+        idx = chunk.rfind(ch)
+        if idx > pos:
+            pos = idx
+    if pos < 0:
+        pos = max_chars - 1
+
+    # 检测 pos 是否落在未闭合的括号对内；若是，前移到最外层开括号之前
+    stack: List[int] = []
+    for i in range(pos + 1):
+        ch = text[i]
+        if ch in _OPEN_BRACKETS:
+            stack.append(i)
+        elif ch in _CLOSE_BRACKETS:
+            if stack:
+                stack.pop()
+    if stack and stack[0] > 0:
+        pos = stack[0] - 1
+    return pos
+
+
 def _wrap_long_sentence_zh(sent: str, max_chars: int) -> List[str]:
-    """把超长中文句在标点处换行，每行 ≤ max_chars 字。"""
+    """把超长中文句在标点处换行，每行 ≤ max_chars 字，且不拆开括号对（书名号）。"""
     lines: List[str] = []
     remaining = sent.strip()
     while len(remaining) > max_chars:
-        chunk = remaining[:max_chars]
-        pos = -1
-        for ch in _ZH_BREAKS:
-            idx = chunk.rfind(ch)
-            if idx > pos:
-                pos = idx
-        if pos < 0:
-            pos = max_chars - 1
+        pos = _safe_zh_break(remaining, max_chars)
         lines.append(remaining[: pos + 1])
         remaining = remaining[pos + 1 :].lstrip()
     if remaining:
@@ -314,7 +339,7 @@ def _emit_segments(
 def split_group(
     group: AlignedGroup,
     max_chars: Optional[int] = None,
-    max_lines: int = 2,
+    max_lines: Optional[int] = None,
     lang: Optional[str] = None,
 ) -> List[SrtSegment]:
     """把一个纠错组拆分为新的 SRT 片段，保留原始片段时间轴。
@@ -324,12 +349,14 @@ def split_group(
     - 破折号（-- / —）作为硬分句边界，破折号后的内容单独成段；
     - 仅当单个原始片段（或单个分句）换行后超 max_lines 行时才在其内部细分时间。
 
-    语言优先取显式参数，其次取 group.lang，每行字符上限按语言自动决定
-    （中文 12 字，英文 23 字符）。
+    语言优先取显式参数，其次取 group.lang。每行字符上限与行数上限都按语言自动决定：
+    中文每行 ≤ 12 字且单行（每片段 1 行），英文每行 ≤ 23 字符且每片段 ≤ 2 行。
     """
     lang = lang or getattr(group, "lang", "en")
     if max_chars is None:
         max_chars = max_chars_for(lang)
+    if max_lines is None:
+        max_lines = 1 if lang == "zh" else 2
 
     segments = group.segments
     texts = _distribute_correct_text(segments, group.correct_text, lang)

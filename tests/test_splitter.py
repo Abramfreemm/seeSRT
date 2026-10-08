@@ -48,6 +48,12 @@ class TestWrapLinesZh:
         for ln in lines:
             assert len(ln) <= 12
 
+    def test_zh_book_title_not_split(self):
+        # 书名号《》及其中的书名保持完整，不被换行拆开
+        text = "我今天读了一本名叫《红楼梦》的书"
+        lines = wrap_lines(text, max_chars=12, lang="zh")
+        assert any("《红楼梦》" in ln for ln in lines)
+
 
 class TestSplitGroup:
     def test_short_single_line(self):
@@ -214,3 +220,32 @@ class TestSplitGroupZh:
         assert len(segs) == 2
         assert segs[0].text == "你好，世界。"
         assert segs[1].text == "谢谢！"
+
+    def test_zh_single_line(self):
+        # 中文为单行字幕：每个片段只有 1 行（不含换行符）
+        seg = SrtSegment(index=1, start="00:00:00,000", end="00:00:04,000", text="x")
+        g = AlignedGroup(
+            dialogue_index=0,
+            segments=[seg],
+            correct_text="这是一段超过十二个字符的中文台词内容需要被拆分处理",
+            lang="zh",
+        )
+        segs = split_group(g)
+        assert segs
+        for s in segs:
+            assert "\n" not in s.text
+            assert len(s.text) <= 12
+
+    def test_zh_book_title_intact_in_distribution(self):
+        # 书名号跨越原始片段边界时，分配后仍保持完整
+        seg1 = SrtSegment(index=1, start="00:00:01,000", end="00:00:02,000", text="我今天读了一本名叫")
+        seg2 = SrtSegment(index=2, start="00:00:02,000", end="00:00:03,000", text="红楼梦的书")
+        g = AlignedGroup(
+            dialogue_index=0,
+            segments=[seg1, seg2],
+            correct_text="我今天读了一本名叫《红楼梦》的书",
+            lang="zh",
+        )
+        segs = split_group(g)
+        assert len(segs) == 2
+        assert any("《红楼梦》" in s.text for s in segs)

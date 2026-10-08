@@ -95,12 +95,12 @@ def build_report(episode: Episode, groups: List[AlignedGroup]) -> dict:
 def groups_to_segments(
     groups: List[AlignedGroup],
     max_chars: Optional[int] = None,
-    max_lines: int = 2,
+    max_lines: Optional[int] = None,
     remove_sound_markers: bool = True,
 ) -> List[SrtSegment]:
     """把纠错组拆分为最终 SRT 片段（可选择性剔除音效标记）。
 
-    max_chars 缺省时按每组语言自动决定（中文 12、英文 23）。
+    max_chars / max_lines 缺省时按每组语言自动决定（中文每行 12 字、单行；英文 23 字符、2 行）。
     """
     segments: List[SrtSegment] = []
     for g in groups:
@@ -114,7 +114,7 @@ def groups_to_segments(
 def export_srt(
     groups: List[AlignedGroup],
     max_chars: Optional[int] = None,
-    max_lines: int = 2,
+    max_lines: Optional[int] = None,
     remove_sound_markers: bool = True,
 ) -> str:
     """导出最终 SRT 文本（先拆分，再选择性剔除音效标记）。"""

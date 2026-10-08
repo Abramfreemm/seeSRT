@@ -148,7 +148,7 @@ function renderGroups() {
       `<div class="split-item"><span class="tt">${s.start} → ${s.end}</span>${escapeHtml(s.text).replace(/\n/g, "<br>")}</div>`
     ).join("");
     const lang = g.lang || "en";
-    const splitHint = lang === "zh" ? "每行 ≤ 12 字 / 每片段 ≤ 2 行" : "每行 ≤ 23 字符 / 每片段 ≤ 2 行";
+    const splitHint = lang === "zh" ? "每行 ≤ 12 字 / 单行字幕" : "每行 ≤ 23 字符 / 每片段 ≤ 2 行";
     return `
       <div class="group ${cls}" data-id="${g.id}">
         <div class="group-head">${badge}
