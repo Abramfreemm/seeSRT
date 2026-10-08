@@ -359,6 +359,24 @@ def split_group(
         max_lines = 1 if lang == "zh" else 2
 
     segments = group.segments
+
+    # 中文短句合并：正确文本若只是一个短分句（无破折号、无句末切分、≤ 一行），
+    # 却命中了多个相邻原始片段（达芬奇/识别把一句话拆成了多段），应合并为单个片段，
+    # 而不是被原始片段边界拆散。时间跨度取首片段 start → 末片段 end，整体时间轴不变。
+    if lang == "zh" and len(segments) > 1:
+        stripped = (group.correct_text or "").strip()
+        if stripped and len(_split_dash_clauses(stripped)) == 1:
+            lines = wrap_lines(stripped, max_chars, lang)
+            if len(lines) == 1:
+                return [
+                    SrtSegment(
+                        index=1,
+                        start=segments[0].start,
+                        end=segments[-1].end,
+                        text=lines[0],
+                    )
+                ]
+
     texts = _distribute_correct_text(segments, group.correct_text, lang)
 
     out: List[SrtSegment] = []

@@ -196,15 +196,14 @@ class TestSplitGroupZh:
                 assert len(line) <= 12
 
     def test_zh_typo_fix_stays_in_segment(self):
-        # 中文错别字：正确文本替换回同一片段，时间码不变
+        # 中文错别字：短句被识别拆成多段时，纠正错别字并合并为单片段，时间跨度取首尾
         seg1 = SrtSegment(index=1, start="00:00:01,000", end="00:00:02,000", text="你好世办")
         seg2 = SrtSegment(index=2, start="00:00:02,000", end="00:00:03,000", text="谢谢")
         g = AlignedGroup(dialogue_index=0, segments=[seg1, seg2], correct_text="你好世界谢谢", lang="zh")
         segs = split_group(g)
-        assert len(segs) == 2
-        assert (segs[0].start, segs[0].end) == ("00:00:01,000", "00:00:02,000")
-        assert segs[0].text == "你好世界"
-        assert segs[1].text == "谢谢"
+        assert len(segs) == 1
+        assert (segs[0].start, segs[0].end) == ("00:00:01,000", "00:00:03,000")
+        assert segs[0].text == "你好世界谢谢"
 
     def test_zh_punctuation_preserved(self):
         # 中文标点按剧本原文保留，并随内容分配到对应片段
@@ -249,3 +248,19 @@ class TestSplitGroupZh:
         segs = split_group(g)
         assert len(segs) == 2
         assert any("《红楼梦》" in s.text for s in segs)
+
+    def test_zh_short_phrase_merged(self):
+        # 短句命中了多个原始片段时，应合并为单个片段，而不是被拆散
+        seg1 = SrtSegment(index=1, start="00:00:01,000", end="00:00:02,000", text="这是哪")
+        seg2 = SrtSegment(index=2, start="00:00:02,000", end="00:00:03,000", text="儿？")
+        g = AlignedGroup(
+            dialogue_index=0,
+            segments=[seg1, seg2],
+            correct_text="这是哪儿？",
+            lang="zh",
+        )
+        segs = split_group(g)
+        assert len(segs) == 1
+        assert segs[0].text == "这是哪儿？"
+        assert segs[0].start == "00:00:01,000"
+        assert segs[0].end == "00:00:03,000"
