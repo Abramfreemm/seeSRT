@@ -61,6 +61,7 @@ def _group_to_dict(g: AlignedGroup) -> dict:
         "dialogue_index": g.dialogue_index,
         "correct_text": g.correct_text,
         "reviewed": g.reviewed,
+        "lang": g.lang,
         "segments": [asdict(s) for s in g.segments],
     }
 
@@ -70,6 +71,7 @@ def _group_from_dict(d: dict) -> AlignedGroup:
         dialogue_index=d["dialogue_index"],
         correct_text=d["correct_text"],
         reviewed=d.get("reviewed", False),
+        lang=d.get("lang", "en"),
         segments=[SrtSegment(**s) for s in d["segments"]],
     )
 

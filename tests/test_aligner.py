@@ -50,3 +50,14 @@ class TestAlign:
         script = ["Hello", "World"]
         segs = [_seg("World")]
         assert align(script, segs) == [1]
+
+    def test_zh_one_to_one(self):
+        script = ["你好世界", "这是一段测试"]
+        segs = [_seg("你好世界"), _seg("这是一段测试")]
+        assert align(script, segs, lang="zh") == [0, 1]
+
+    def test_zh_typo_align(self):
+        # 中文错别字仍能对齐（逐字 LCS）
+        script = ["你好世界"]
+        segs = [_seg("你好世办")]
+        assert align(script, segs, lang="zh") == [0]

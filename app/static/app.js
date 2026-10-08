@@ -48,17 +48,18 @@ function setStep(n) {
   });
 }
 
-function renderDiffLine(ops, side) {
+function renderDiffLine(ops, side, lang) {
+  const sep = lang === "zh" ? "" : " ";
   let html = "";
   for (const op of ops) {
     if (side === "old") {
       if (op.op === "insert") continue;
       const cls = (op.op === "replace" || op.op === "delete") ? "del" : "";
-      html += cls ? `<span class="${cls}">${escapeHtml(op.old)}</span> ` : `${escapeHtml(op.old)} `;
+      html += cls ? `<span class="${cls}">${escapeHtml(op.old)}</span>${sep}` : `${escapeHtml(op.old)}${sep}`;
     } else {
       if (op.op === "delete") continue;
       const cls = (op.op === "replace" || op.op === "insert") ? "ins" : "";
-      html += cls ? `<span class="${cls}">${escapeHtml(op.new)}</span> ` : `${escapeHtml(op.new)} `;
+      html += cls ? `<span class="${cls}">${escapeHtml(op.new)}</span>${sep}` : `${escapeHtml(op.new)}${sep}`;
     }
   }
   return html;
@@ -89,7 +90,7 @@ function renderLib() {
         <div class="lib-scene">
           <div class="sc-title">场景 ${sc.scene_no}</div>
           ${sc.dialogues.map((d) => `
-            <div class="lib-dlg" data-en="${escapeHtml(d.text_en || '')}">
+            <div class="lib-dlg" data-copy="${escapeHtml(d.text_en || d.text_zh)}">
               <div class="zh">${escapeHtml(d.text_zh || '')}</div>
               <div class="en">${escapeHtml(d.text_en || '')}</div>
             </div>`).join("")}
@@ -146,20 +147,22 @@ function renderGroups() {
     const splitHtml = (g.split || []).map((s) =>
       `<div class="split-item"><span class="tt">${s.start} → ${s.end}</span>${escapeHtml(s.text).replace(/\n/g, "<br>")}</div>`
     ).join("");
+    const lang = g.lang || "en";
+    const splitHint = lang === "zh" ? "每行 ≤ 12 字 / 每片段 ≤ 2 行" : "每行 ≤ 23 字符 / 每片段 ≤ 2 行";
     return `
       <div class="group ${cls}" data-id="${g.id}">
         <div class="group-head">${badge}
           <span class="time">${g.start} → ${g.end}</span>
         </div>
-        <div class="diff-line"><span class="lbl">原文</span><span class="txt">${renderDiffLine(g.diff, "old")}</span></div>
-        <div class="diff-line"><span class="lbl">修正</span><span class="txt">${renderDiffLine(g.diff, "new")}</span></div>
+        <div class="diff-line"><span class="lbl">原文</span><span class="txt">${renderDiffLine(g.diff, "old", lang)}</span></div>
+        <div class="diff-line"><span class="lbl">修正</span><span class="txt">${renderDiffLine(g.diff, "new", lang)}</span></div>
         <div class="group-actions">
           <button class="btn small" data-act="edit">编辑</button>
           <button class="btn small" data-act="undo" ${g.corrected === g.original ? "disabled" : ""}>改回原文</button>
           ${reviewBtn}
         </div>
         <div class="split-preview">
-          <h4>拆分预览（每行 ≤ 23 字符 / 每片段 ≤ 2 行）</h4>
+          <h4>拆分预览（${splitHint}）</h4>
           ${splitHtml}
         </div>
       </div>`;
@@ -488,10 +491,12 @@ function bindGlobal() {
       state.current = null;
       if (r.count === 0) {
         $("#script-status").textContent = "解析到 0 集：请确认剧本含「第X集」标题与台词";
-      } else if (!r.total_en_lines) {
-        $("#script-status").textContent = `已解析 ${r.count} 集，但未提取到英文台词，请确认剧本格式`;
-      } else {
+      } else if (r.total_en_lines) {
         $("#script-status").textContent = `已解析 ${r.count} 集 · ${r.total_en_lines} 句英文台词`;
+      } else if (r.total_zh_lines) {
+        $("#script-status").textContent = `已解析 ${r.count} 集 · ${r.total_zh_lines} 句中文台词`;
+      } else {
+        $("#script-status").textContent = `已解析 ${r.count} 集，但未提取到台词，请确认剧本格式`;
       }
       setStep(1);
       renderLib();
@@ -587,9 +592,9 @@ function bindGlobal() {
   $("#lib").addEventListener("click", (e) => {
     const dlg = e.target.closest(".lib-dlg");
     if (!dlg) return;
-    const en = dlg.dataset.en;
-    if (!en) return;
-    navigator.clipboard.writeText(en).then(() => {
+    const copy = dlg.dataset.copy;
+    if (!copy) return;
+    navigator.clipboard.writeText(copy).then(() => {
       const orig = dlg.style.background;
       dlg.style.background = "#d8f0dc";
       setTimeout(() => { dlg.style.background = orig; }, 600);

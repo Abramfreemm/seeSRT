@@ -14,14 +14,17 @@ from __future__ import annotations
 from difflib import SequenceMatcher
 from typing import Dict, List
 
+from app.lang import tokenize_pairs
 
-def diff_words(old: str, new: str) -> List[Dict[str, str]]:
-    """逐词比较 old 与 new，返回差异操作列表。
 
+def diff_words(old: str, new: str, lang: str = "en") -> List[Dict[str, str]]:
+    """逐词/逐字比较 old 与 new，返回差异操作列表。
+
+    英文按词（空格分词）比较，中文按单字比较，均保留原始大小写以高亮大小写修正。
     每个元素为 {"op": "equal|delete|insert|replace", "old": str, "new": str}。
     """
-    a = old.split()
-    b = new.split()
+    a, _ = tokenize_pairs(old, lang)
+    b, _ = tokenize_pairs(new, lang)
     matcher = SequenceMatcher(None, a, b, autojunk=False)
     ops: List[Dict[str, str]] = []
 

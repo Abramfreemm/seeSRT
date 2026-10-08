@@ -2,7 +2,7 @@
 
 from app.correct.corrector import AlignedGroup
 from app.extraction.dialogue_extractor import Dialogue, Episode, Scene
-from app.pipeline import build_report, export_srt, groups_to_segments
+from app.pipeline import build_report, episode_lines, export_srt, groups_to_segments, process_episode
 from app.srt_parser import SrtSegment, is_sound_marker, parse_srt
 
 
@@ -71,4 +71,37 @@ def test_build_report_missing_and_extra():
     assert report["missing_dialogues"] == ["Missing line"]
     assert report["extra_segments"] == ["unmatched extra"]
     assert report["sound_markers"] == 1
+
+
+def test_episode_lines_prefers_en():
+    ep = _episode(["Hello world"])
+    lang, lines = episode_lines(ep)
+    assert lang == "en"
+    assert lines == ["Hello world"]
+
+
+def test_episode_lines_falls_back_to_zh():
+    ep = Episode(
+        episode_no=1,
+        scenes=[Scene(scene_no="1-1", dialogues=[Dialogue(text_zh="你好世界", text_en="")])],
+    )
+    lang, lines = episode_lines(ep)
+    assert lang == "zh"
+    assert lines == ["你好世界"]
+
+
+def test_zh_process_and_export():
+    ep = Episode(
+        episode_no=1,
+        scenes=[Scene(scene_no="1-1", dialogues=[Dialogue(text_zh="你好世界", text_en="")])],
+    )
+    segs = [SrtSegment(index=1, start="00:00:00,000", end="00:00:02,000", text="你好世办")]
+    groups = process_episode(ep, segs)
+    assert groups[0].lang == "zh"
+    assert groups[0].correct_text == "你好世界"
+
+    out = export_srt(groups)
+    assert "你好世界" in out
+    parsed = parse_srt(out)
+    assert parsed[0].text == "你好世界"
 

@@ -21,6 +21,7 @@ class AlignedGroup:
     segments: List[SrtSegment] = field(default_factory=list)
     correct_text: str = ""  # 纠错后的正确文本
     reviewed: bool = False  # 未命中片段是否已人工复核确认
+    lang: str = "en"  # 本组语言（"en" / "zh"），决定分词/换行/差异展示方式
 
     @property
     def matched(self) -> bool:
@@ -66,12 +67,14 @@ def _normalize_unmatched_case(text: str) -> str:
 def group_corrections(
     srt_segments: List[SrtSegment],
     alignment: List[Optional[int]],
-    script_en_lines: List[str],
+    script_lines: List[str],
+    lang: str = "en",
 ) -> List[AlignedGroup]:
     """根据对齐结果分组，产出纠错组。
 
     - 连续命中同一台词的片段合并为一组，correct_text = 剧本原文。
     - 未命中片段各自成组，correct_text = 原文本（待人工复核）。
+    - 中文不做英文大小写规范化，仅保留原文。
     """
     groups: List[AlignedGroup] = []
     i = 0
@@ -79,11 +82,15 @@ def group_corrections(
     while i < n:
         di = alignment[i]
         if di is None:
+            unmatched = srt_segments[i].text
+            if lang == "en":
+                unmatched = _normalize_unmatched_case(unmatched)
             groups.append(
                 AlignedGroup(
                     dialogue_index=None,
                     segments=[srt_segments[i]],
-                    correct_text=_normalize_unmatched_case(srt_segments[i].text),
+                    correct_text=unmatched,
+                    lang=lang,
                 )
             )
             i += 1
@@ -97,7 +104,8 @@ def group_corrections(
                 AlignedGroup(
                     dialogue_index=di,
                     segments=segs,
-                    correct_text=script_en_lines[di],
+                    correct_text=script_lines[di],
+                    lang=lang,
                 )
             )
             i = j

@@ -39,3 +39,23 @@ def test_insert_word():
 def test_delete_word():
     ops = diff_words("I really love you", "I love you")
     assert ops[1] == {"op": "delete", "old": "really", "new": ""}
+
+
+def test_zh_char_replace():
+    # 中文错别字逐字标红
+    ops = diff_words("你好世界", "你好世办", lang="zh")
+    assert ops == [
+        {"op": "equal", "old": "你", "new": "你"},
+        {"op": "equal", "old": "好", "new": "好"},
+        {"op": "equal", "old": "世", "new": "世"},
+        {"op": "replace", "old": "界", "new": "办"},
+    ]
+
+
+def test_zh_equal():
+    assert diff_words("你好世界", "你好世界", lang="zh") == [
+        {"op": "equal", "old": "你", "new": "你"},
+        {"op": "equal", "old": "好", "new": "好"},
+        {"op": "equal", "old": "世", "new": "世"},
+        {"op": "equal", "old": "界", "new": "界"},
+    ]

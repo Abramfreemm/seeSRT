@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from app.align.aligner import align
 from app.correct.corrector import AlignedGroup, group_corrections
@@ -31,28 +31,49 @@ def episode_en_lines(episode: Episode) -> List[str]:
     return lines
 
 
+def episode_zh_lines(episode: Episode) -> List[str]:
+    """取一集内所有非空中文台词（作为对齐的标准答案）。"""
+    lines: List[str] = []
+    for scene in episode.scenes:
+        for d in scene.dialogues:
+            if d.text_zh.strip():
+                lines.append(d.text_zh.strip())
+    return lines
+
+
+def episode_lines(episode: Episode) -> Tuple[str, List[str]]:
+    """返回该集 (语言, 标准答案台词列表)。
+
+    有英文台词按英文处理，否则按中文处理（识别不到英文即按中文）。
+    """
+    en_lines = episode_en_lines(episode)
+    if en_lines:
+        return "en", en_lines
+    return "zh", episode_zh_lines(episode)
+
+
 def process_episode(
     episode: Episode,
     srt_segments: List[SrtSegment],
     threshold: float = 0.55,
 ) -> List[AlignedGroup]:
-    """对一集执行「对齐 → 纠错（分组）」，返回纠错组列表。"""
-    en_lines = episode_en_lines(episode)
-    alignment = align(en_lines, srt_segments, threshold=threshold)
-    return group_corrections(srt_segments, alignment, en_lines)
+    """对一集执行「对齐 → 纠错（分组）」，返回纠错组列表（中英文自动识别）。"""
+    lang, lines = episode_lines(episode)
+    alignment = align(lines, srt_segments, threshold=threshold, lang=lang)
+    return group_corrections(srt_segments, alignment, lines, lang=lang)
 
 
 def build_report(episode: Episode, groups: List[AlignedGroup]) -> dict:
     """生成一集的完整度报告。
 
-    - missing：剧本中有英文台词但无任何片段命中（缺失台词）。
+    - missing：剧本中有台词但无任何片段命中（缺失台词）。
     - extra：SRT 中未命中且非音效标记的片段（多余/需复核片段）。
     - sound_markers：音效标记片段数（导出时删除）。
     """
-    en_lines = episode_en_lines(episode)
+    _, lines = episode_lines(episode)
     matched_indices = {g.dialogue_index for g in groups if g.matched}
 
-    missing = [en_lines[i] for i in range(len(en_lines)) if i not in matched_indices]
+    missing = [lines[i] for i in range(len(lines)) if i not in matched_indices]
     extra = [
         g.original_text
         for g in groups
@@ -61,7 +82,7 @@ def build_report(episode: Episode, groups: List[AlignedGroup]) -> dict:
     sound_markers = sum(1 for g in groups if is_sound_marker(g.correct_text))
 
     return {
-        "total_dialogues": len(en_lines),
+        "total_dialogues": len(lines),
         "matched_dialogues": len(matched_indices),
         "missing_dialogues": missing,
         "missing_count": len(missing),
@@ -73,11 +94,14 @@ def build_report(episode: Episode, groups: List[AlignedGroup]) -> dict:
 
 def groups_to_segments(
     groups: List[AlignedGroup],
-    max_chars: int = 23,
+    max_chars: Optional[int] = None,
     max_lines: int = 2,
     remove_sound_markers: bool = True,
 ) -> List[SrtSegment]:
-    """把纠错组拆分为最终 SRT 片段（可选择性剔除音效标记）。"""
+    """把纠错组拆分为最终 SRT 片段（可选择性剔除音效标记）。
+
+    max_chars 缺省时按每组语言自动决定（中文 12、英文 23）。
+    """
     segments: List[SrtSegment] = []
     for g in groups:
         for seg in split_group(g, max_chars=max_chars, max_lines=max_lines):
@@ -89,7 +113,7 @@ def groups_to_segments(
 
 def export_srt(
     groups: List[AlignedGroup],
-    max_chars: int = 23,
+    max_chars: Optional[int] = None,
     max_lines: int = 2,
     remove_sound_markers: bool = True,
 ) -> str:

@@ -13,63 +13,59 @@
 
 from __future__ import annotations
 
-import re
 from collections import Counter, defaultdict
 from difflib import SequenceMatcher
 from typing import List, Optional
 
+from app.lang import normalize_en, tokenize
 from app.srt_parser import SrtSegment, is_sound_marker
 
 
 def _normalize(s: str) -> str:
     """归一化：小写 + 去所有非字母数字字符，用于相似度比较。"""
-    return re.sub(r"[^a-z0-9]", "", s.lower())
-
-
-def _words(text: str) -> List[str]:
-    """把文本切分为归一化词元（收缩形式如 "don't" → "dont" 保持为单个词元）。"""
-    return [w for w in (_normalize(tok) for tok in text.split()) if w]
+    return normalize_en(s)
 
 
 def align(
-    script_en_lines: List[str],
+    script_lines: List[str],
     srt_segments: List[SrtSegment],
     threshold: float = 0.55,
+    lang: str = "en",
 ) -> List[Optional[int]]:
-    """把 SRT 片段对齐到剧本英文台词。
+    """把 SRT 片段对齐到剧本台词（中英文均支持）。
 
     返回与 srt_segments 等长的列表，每项为该片段命中的台词索引（None 表示未命中）。
 
-    算法：词级 LCS 对齐。
-    1. 剧本台词展开为词序列，记录每个词属于哪一句台词。
-    2. SRT（跳过音效标记）展开为词序列，记录每个词属于哪个片段。
-    3. 用 SequenceMatcher 求两个词序列的最长公共子序列（匹配块）。
-    4. 对每个片段，统计其词中命中各台词的数量，占比达到 threshold 者即认定命中该台词。
+    算法：词/字级 LCS 对齐。
+    1. 剧本台词按语言分词（英文按词、中文按字），记录每个 token 属于哪一句台词。
+    2. SRT（跳过音效标记）按语言分词，记录每个 token 属于哪个片段。
+    3. 用 SequenceMatcher 求两个 token 序列的最长公共子序列（匹配块）。
+    4. 对每个片段，统计其 token 中命中各台词的数量，占比达到 threshold 者即认定命中该台词。
     """
     result: List[Optional[int]] = [None] * len(srt_segments)
 
-    # 剧本词序列 + 词 → 台词索引
+    # 剧本 token 序列 + token → 台词索引
     script_seq: List[str] = []
     script_line_of: List[int] = []
-    for li, line in enumerate(script_en_lines):
-        for w in _words(line):
+    for li, line in enumerate(script_lines):
+        for w in tokenize(line, lang):
             script_seq.append(w)
             script_line_of.append(li)
 
-    # SRT 词序列 + 词 → 片段索引（跳过音效标记）
+    # SRT token 序列 + token → 片段索引（跳过音效标记）
     srt_seq: List[str] = []
     srt_seg_of: List[int] = []
     for i, seg in enumerate(srt_segments):
         if is_sound_marker(seg.text):
             continue
-        for w in _words(seg.text):
+        for w in tokenize(seg.text, lang):
             srt_seq.append(w)
             srt_seg_of.append(i)
 
     if not script_seq or not srt_seq:
         return result
 
-    # 词级 LCS 匹配块：把 SRT 词位置映射到命中的台词索引
+    # token 级 LCS 匹配块：把 SRT token 位置映射到命中的台词索引
     matcher = SequenceMatcher(None, srt_seq, script_seq, autojunk=False)
     srt_word_line: dict = {}
     for a, b, size in matcher.get_matching_blocks():

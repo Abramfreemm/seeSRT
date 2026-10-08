@@ -20,7 +20,7 @@ from pydantic import BaseModel
 
 from app.correct.corrector import AlignedGroup
 from app.correct.diff import diff_words
-from app.pipeline import build_report, episode_en_lines, export_srt, extract_script, process_episode
+from app.pipeline import build_report, episode_en_lines, episode_zh_lines, export_srt, extract_script, process_episode
 from app.split.splitter import split_group
 from app.srt_parser import is_sound_marker, read_srt_file
 from app.storage import clear_state, load_state, save_state
@@ -63,7 +63,8 @@ def _group_to_dict(g: AlignedGroup, idx: int) -> dict:
         "original": g.original_text,
         "corrected": g.correct_text,
         "reviewed": g.reviewed,
-        "diff": diff_words(g.original_text, g.correct_text),
+        "lang": g.lang,
+        "diff": diff_words(g.original_text, g.correct_text, g.lang),
         "is_sound_marker": is_sound_marker(g.correct_text),
         "split": [
             {"start": s.start, "end": s.end, "text": s.text}
@@ -134,6 +135,7 @@ async def upload_script(file: UploadFile = File(...)):
     return {
         "count": len(episodes),
         "total_en_lines": sum(len(episode_en_lines(e)) for e in episodes),
+        "total_zh_lines": sum(len(episode_zh_lines(e)) for e in episodes),
         "episodes": [_episode_to_dict(e) for e in episodes],
     }
 

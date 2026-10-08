@@ -57,3 +57,18 @@ class TestGroupCorrections:
         assert groups[0].correct_text == "Hello world"
         assert groups[1].correct_text == "??? bad"
         assert groups[2].correct_text == "Goodbye"
+
+    def test_zh_matched_group(self):
+        script = ["你好世界"]
+        groups = group_corrections([_seg("你好世界")], [0], script, lang="zh")
+        assert len(groups) == 1
+        assert groups[0].matched
+        assert groups[0].correct_text == "你好世界"
+        assert groups[0].lang == "zh"
+
+    def test_zh_unmatched_unchanged(self):
+        # 中文未命中片段不做大小写规范化，保留原文
+        script = ["你好世界"]
+        groups = group_corrections([_seg("未知内容")], [None], script, lang="zh")
+        assert groups[0].correct_text == "未知内容"
+        assert groups[0].lang == "zh"
